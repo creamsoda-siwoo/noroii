@@ -13,81 +13,128 @@
 </head>
 <body>
   <div class="fog"></div>
+  <button id="soundBtn" class="sound-btn" aria-label="배경음 켜기" title="배경음">🔇</button>
 
   <header>
     <div class="candles"><span class="candle"></span><span class="candle"></span></div>
     <h1>呪 노로이 呪</h1>
     <p class="sub">한밤중, 촛불 아래에서… 사소하고 하찮은 저주를 내려보세요.</p>
+    <p class="fortune" id="fortune"></p>
   </header>
 
   <main>
     <section class="panel ritual">
       <h2>① 저주 의식 준비</h2>
       <label>저주할 대상의 이름
-        <input id="target" type="text" maxlength="20" placeholder="예: 내 알람시계">
+        <input id="target" type="text" maxlength="20" placeholder="예: 내 알람시계" autocomplete="off">
       </label>
-      <label>저주의 종류
-        <select id="curseType">
-          <option value="daily">일상의 불편함</option>
-          <option value="food">음식의 배신</option>
-          <option value="tech">기계의 반란</option>
-          <option value="luck">소소한 불운</option>
-        </select>
-      </label>
-      <button id="bindBtn" class="btn">🕯️ 인형에 이름 새기기</button>
+      <div class="field">
+        <span class="field-label">저주의 종류</span>
+        <div class="chips" id="typeChips"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">인형 고르기</span>
+        <div class="chips skins" id="skinChips"></div>
+      </div>
+      <button id="bindBtn" class="btn wide">🕯️ 인형에 이름 새기기</button>
     </section>
 
     <section class="panel doll-area">
       <h2>② 저주인형</h2>
+      <div class="tools" id="tools" role="radiogroup" aria-label="도구"></div>
       <p class="hint" id="dollHint">먼저 인형에 이름을 새기세요.</p>
-      <div class="doll-wrap" id="dollWrap">
-        <svg id="doll" viewBox="0 0 200 300" aria-label="저주인형">
-          <defs>
-            <pattern id="burlap" width="6" height="6" patternUnits="userSpaceOnUse">
-              <rect width="6" height="6" fill="#b58b5a"/>
-              <path d="M0 3h6M3 0v6" stroke="#9c7445" stroke-width="1"/>
-            </pattern>
-          </defs>
-          <g id="dollBody" fill="url(#burlap)" stroke="#5a3d1e" stroke-width="3">
-            <path data-part="왼팔" d="M70 120 L15 105 Q5 115 15 128 L70 145 Z"/>
-            <path data-part="오른팔" d="M130 120 L185 105 Q195 115 185 128 L130 145 Z"/>
-            <path data-part="왼다리" d="M75 210 L55 285 Q70 295 85 285 L98 215 Z"/>
-            <path data-part="오른다리" d="M125 210 L145 285 Q130 295 115 285 L102 215 Z"/>
-            <path data-part="몸통" d="M68 110 Q100 100 132 110 L135 215 Q100 230 65 215 Z"/>
-            <circle data-part="머리" cx="100" cy="62" r="45"/>
-          </g>
-          <!-- 바느질 자국 -->
-          <g stroke="#3b2510" stroke-width="2" fill="none" pointer-events="none">
-            <path d="M100 112 V220" stroke-dasharray="5 5"/>
-            <path d="M82 50 l12 12 M94 50 l-12 12"/>
-            <path d="M106 50 l12 12 M118 50 l-12 12"/>
-            <path d="M80 85 q20 -10 40 0" />
-            <path d="M84 82 v6 M92 79 v6 M100 78 v6 M108 79 v6 M116 82 v6" />
-          </g>
-          <rect x="66" y="150" width="68" height="34" fill="#f2e6c9" stroke="#3b2510" stroke-width="2" pointer-events="none" transform="rotate(-4 100 167)"/>
-          <text id="dollName" x="100" y="173" text-anchor="middle" pointer-events="none" transform="rotate(-4 100 167)">???</text>
-          <g id="pins"></g>
-        </svg>
+
+      <div class="altar">
+        <div class="ritual-candles" id="ritualCandles" aria-label="촛불을 켜면 저주력이 강해진다"></div>
+        <div class="doll-wrap">
+          <svg id="doll" viewBox="0 0 200 300" aria-label="저주인형">
+            <defs>
+              <pattern id="pat-straw" width="6" height="6" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="#b58b5a"/>
+                <path d="M0 3h6M3 0v6" stroke="#9c7445" stroke-width="1"/>
+              </pattern>
+              <pattern id="pat-felt" width="10" height="10" patternUnits="userSpaceOnUse">
+                <rect width="10" height="10" fill="#8a5a32"/>
+                <circle cx="3" cy="3" r="1" fill="#7a4c28"/><circle cx="8" cy="7" r="1" fill="#9a6a3e"/>
+              </pattern>
+              <pattern id="pat-bone" width="20" height="20" patternUnits="userSpaceOnUse">
+                <rect width="20" height="20" fill="#e6dfcc"/>
+                <path d="M2 4 l5 3 l-2 4 M14 12 l3 4" stroke="#c9bfa6" stroke-width="1" fill="none"/>
+              </pattern>
+              <pattern id="pat-yarn" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="8" height="8" fill="#6b3f8c"/>
+                <path d="M0 4h8" stroke="#845aa8" stroke-width="3"/>
+              </pattern>
+              <radialGradient id="burnGrad">
+                <stop offset="0" stop-color="#140600" stop-opacity=".95"/>
+                <stop offset=".55" stop-color="#3a1300" stop-opacity=".7"/>
+                <stop offset="1" stop-color="#3a1300" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <g id="dollBody" fill="url(#pat-straw)" stroke="#5a3d1e" stroke-width="3">
+              <g id="ears">
+                <circle data-part="머리" cx="62" cy="28" r="17"/>
+                <circle data-part="머리" cx="138" cy="28" r="17"/>
+              </g>
+              <path data-part="왼팔" d="M70 120 L15 105 Q5 115 15 128 L70 145 Z"/>
+              <path data-part="오른팔" d="M130 120 L185 105 Q195 115 185 128 L130 145 Z"/>
+              <path data-part="왼다리" d="M75 210 L55 285 Q70 295 85 285 L98 215 Z"/>
+              <path data-part="오른다리" d="M125 210 L145 285 Q130 295 115 285 L102 215 Z"/>
+              <path data-part="몸통" d="M68 110 Q100 100 132 110 L135 215 Q100 230 65 215 Z"/>
+              <circle data-part="머리" cx="100" cy="62" r="45"/>
+            </g>
+            <g id="face" stroke="#3b2510" stroke-width="2" fill="none" pointer-events="none">
+              <path d="M100 112 V220" stroke-dasharray="5 5"/>
+              <path d="M82 50 l12 12 M94 50 l-12 12"/>
+              <path d="M106 50 l12 12 M118 50 l-12 12"/>
+              <path d="M80 85 q20 -10 40 0"/>
+              <path d="M84 82 v6 M92 79 v6 M100 78 v6 M108 79 v6 M116 82 v6"/>
+            </g>
+            <rect x="66" y="150" width="68" height="34" fill="#f2e6c9" stroke="#3b2510" stroke-width="2" pointer-events="none" transform="rotate(-4 100 167)"/>
+            <text id="dollName" x="100" y="173" text-anchor="middle" pointer-events="none" transform="rotate(-4 100 167)">???</text>
+            <g id="marks" pointer-events="none"></g>
+          </svg>
+        </div>
       </div>
+
       <div class="meter">
         <span>저주력</span>
         <div class="bar"><div id="meterFill"></div></div>
         <span id="meterNum">0%</span>
       </div>
+      <p class="bonus" id="bonusLine"></p>
+
+      <button id="chantBtn" class="btn chant" disabled>
+        <span class="chant-fill" id="chantFill"></span>
+        <span class="chant-label" id="chantLabel">🗣️ 꾹 눌러서 주문 외우기</span>
+      </button>
+      <p class="incant" id="incant"></p>
+
       <div class="actions">
-        <button id="resetBtn" class="btn ghost">🧹 바늘 뽑기</button>
+        <button id="resetBtn" class="btn ghost">🧹 처음부터</button>
         <button id="castBtn" class="btn danger" disabled>💀 저주 발동</button>
       </div>
+    </section>
+
+    <section class="panel stats">
+      <h2>🏆 업적 <small id="badgeCount"></small></h2>
+      <div class="stat-row" id="statRow"></div>
+      <ul class="badges" id="badges"></ul>
     </section>
 
     <section class="panel result" id="result" hidden>
       <h2>③ 저주가 내려졌다</h2>
       <div class="scroll" id="scroll"></div>
-      <button id="againBtn" class="btn">🔁 다른 저주</button>
+      <div class="share">
+        <button id="copyBtn" class="btn ghost">📋 복사</button>
+        <button id="shareBtn" class="btn ghost">📤 공유</button>
+        <button id="imgBtn" class="btn ghost">🖼️ 이미지 저장</button>
+      </div>
+      <button id="againBtn" class="btn wide">🔁 같은 의식으로 다시 저주</button>
     </section>
 
     <section class="panel log">
-      <h2>📜 저주 기록부</h2>
+      <h2>📜 저주 기록부 <button id="clearLog" class="link-btn">지우기</button></h2>
       <ul id="logList"><li class="empty">아직 아무도 저주받지 않았다…</li></ul>
     </section>
   </main>
@@ -97,6 +144,7 @@
   </footer>
 
   <div class="flash" id="flash"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="script.js"></script>
 </body>
 </html>
