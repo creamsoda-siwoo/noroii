@@ -50,6 +50,7 @@ let audio;
 function tone(freq, dur, type = "sine", vol = 0.15, slide = 0) {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
     const o = audio.createOscillator();
     const g = audio.createGain();
     o.type = type;
@@ -111,6 +112,7 @@ doll.addEventListener("click", (e) => {
   void doll.getBBox();
   doll.classList.add("shake");
   sfxStab();
+  if (navigator.vibrate) navigator.vibrate(30);
 });
 
 function addPin(x, y) {
@@ -183,6 +185,7 @@ function cast() {
   void flash.offsetWidth;
   flash.classList.add("on");
   sfxCast();
+  if (navigator.vibrate) navigator.vibrate([80, 60, 160]);
 
   addLog(`${target} — ${rank(power)} (${curses[0]}${curses.length > 1 ? " 외" : ""})`);
   $("result").scrollIntoView({ behavior: "smooth", block: "center" });
