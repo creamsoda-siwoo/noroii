@@ -201,6 +201,35 @@ const BADGES = [
   { id: "destroy", icon: "💥", name: "인형 박살", desc: "인형을 터뜨렸다" },
   { id: "pins500", icon: "🦔", name: "고슴도치", desc: "바늘·못 500개" },
   { id: "author", icon: "✍️", name: "저주 작가", desc: "나만의 저주 작성" },
+  { id: "ghost10", icon: "👻", name: "유령 사냥꾼", desc: "유령 10마리 포획" },
+  { id: "gold", icon: "🌟", name: "황금 부적", desc: "전설 부적 획득" },
+  { id: "talisAll", icon: "🧧", name: "부적 도감 완성", desc: "부적 전부 수집" },
+  { id: "mercy", icon: "🕊️", name: "자비", desc: "저주를 풀어줬다" },
+  { id: "shake", icon: "📳", name: "흔들어 저주", desc: "폰을 흔들어 발동" },
+];
+
+const RARITY = {
+  c: { name: "일반", color: "#9b8a7a" },
+  r: { name: "희귀", color: "#4a9be0" },
+  e: { name: "영웅", color: "#b04ae0" },
+  l: { name: "전설", color: "#e0b44c" },
+};
+const TALISMANS = [
+  { id: "sock", r: "c", icon: "🧦", name: "젖은 양말 부적" },
+  { id: "battery", r: "c", icon: "🔋", name: "13% 배터리 부적" },
+  { id: "chicken", r: "c", icon: "🍗", name: "퍽퍽살 부적" },
+  { id: "earphone", r: "c", icon: "🎧", name: "엉킨 이어폰 부적" },
+  { id: "wifi", r: "c", icon: "📶", name: "와이파이 한 칸 부적" },
+  { id: "tissue", r: "c", icon: "🧻", name: "마지막 휴지 부적" },
+  { id: "snack", r: "r", icon: "🍿", name: "질소 과자 부적" },
+  { id: "redlight", r: "r", icon: "🚦", name: "빨간불 부적" },
+  { id: "afk", r: "r", icon: "🏃", name: "탈주 팀원 부적" },
+  { id: "elevator", r: "r", icon: "🛗", name: "닫히는 엘리베이터 부적" },
+  { id: "enchant", r: "e", icon: "💥", name: "+9 강화 실패 부적" },
+  { id: "monday", r: "e", icon: "📅", name: "월요병 부적" },
+  { id: "deadline", r: "e", icon: "⏰", name: "마감 착각 부적" },
+  { id: "moon", r: "l", icon: "🌕", name: "보름달 노로이 부적" },
+  { id: "goldchicken", r: "l", icon: "👑", name: "황금 퍽퍽살 부적" },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -222,6 +251,7 @@ const state = {
   combo: 0,
   lastStab: 0,
   destroyed: 0,
+  ghosts: 0,
 };
 
 // ── 저장소 ──
@@ -232,7 +262,7 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
 }
 const stats = Object.assign(
-  { curses: 0, pins: 0, burns: 0, salts: 0, chants: 0, reflected: 0, maxCombo: 0, destroys: 0, authored: false, types: [], skins: [], badges: [] },
+  { curses: 0, pins: 0, burns: 0, salts: 0, chants: 0, reflected: 0, maxCombo: 0, destroys: 0, authored: false, ghosts: 0, mercy: 0, shakeCasts: 0, goldTalis: false, talis: [], types: [], skins: [], badges: [] },
   load("noroii-stats", {}),
 );
 
@@ -296,6 +326,10 @@ const SFX = {
   badge: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, "sine", 0.07, 0, i * 0.09)),
   burst: () => { noise(0.9, 0.5, 400); tone(80, 1.2, "sawtooth", 0.15, 30); tone(1400, 0.4, "square", 0.04, 200, 0.1); },
   tick: (i) => tone(500 + (i % 4) * 120, 0.05, "square", 0.03),
+  ghost: () => { tone(420, 1.2, "sine", 0.05, 260); tone(630, 1.2, "sine", 0.03, 390, 0.15); },
+  ghostCatch: () => { tone(900, 0.3, "triangle", 0.08, 1800); noise(0.3, 0.15, 2500); },
+  thunder: () => { noise(2.8, 0.6, 110); noise(1.2, 0.3, 300); },
+  talis: () => [784, 988, 1175].forEach((f, i) => tone(f, 0.4, "triangle", 0.06, 0, i * 0.07)),
 };
 
 // ── 브금 (WebAudio로 실시간 생성하는 오르골) ──
@@ -497,6 +531,7 @@ $("bindBtn").addEventListener("click", () => {
   $("chantBtn").disabled = false;
   resetRitual();
   $("dollHint").textContent = `「${name}」 인형 완성. ` + toolHint();
+  scheduleGhost(8000);
   SFX.bind();
 });
 $("target").addEventListener("keydown", (e) => e.key === "Enter" && $("bindBtn").click());
@@ -587,6 +622,7 @@ function stabAt(part, x, y) {
   $("dollHint").textContent = `${part}에 ${toolName}! (총 ${state.marks.length}개${state.combo >= 3 ? ` · ${state.combo}콤보 ×${comboMul.toFixed(2)}` : ""})`;
 
   state.hp -= gain;
+  flinch();
   if (state.hp <= 0) {
     burst();
   } else if (state.hp < HP_MAX * 0.25 && Math.random() < 0.4) {
@@ -651,6 +687,18 @@ function say(text, force) {
   bubbleTimer = setTimeout(() => b.classList.remove("on"), 1400);
 }
 
+let flinchTimer = 0;
+function faceFor() {
+  const r = state.hp / HP_MAX;
+  return r < 0.25 ? "crit" : r < 0.5 ? "hurt" : "normal";
+}
+function setFace(f) { doll.dataset.face = f; }
+function flinch() {
+  setFace(faceFor() === "normal" ? "hurt" : "crit");
+  clearTimeout(flinchTimer);
+  flinchTimer = setTimeout(() => setFace(faceFor()), 280);
+}
+
 function burst() {
   state.destroyed++;
   stats.destroys++;
@@ -693,6 +741,7 @@ function purify(x, y) {
   stats.salts++;
   SFX.salt();
   state.hp = Math.min(HP_MAX, state.hp + m.gain);
+  setFace(faceFor());
   if (Math.random() < 0.5) say(pick(TOOL_LINES.salt));
   $("dollHint").textContent = `정화 완료. 저주력이 ${m.gain} 줄었다. (남은 자국 ${state.marks.length}개)`;
   updateMeter();
@@ -782,7 +831,8 @@ function typeOut(node, text) {
 // ── 저주력 계산 ──
 function finalPower() {
   const destroyBonus = Math.min(state.destroyed, 3) * 30;
-  return Math.max(0, Math.round(state.power * (1 + 0.1 * state.candles) + (state.chanted ? 15 : 0) + destroyBonus + fortune.bonus));
+  const ghostBonus = Math.min(state.ghosts, 5) * 10;
+  return Math.max(0, Math.round(state.power * (1 + 0.1 * state.candles) + (state.chanted ? 15 : 0) + destroyBonus + ghostBonus + stats.talis.length + fortune.bonus));
 }
 
 function updateMeter() {
@@ -800,6 +850,8 @@ function updateMeter() {
   if (state.candles) parts.push(`🕯️×${state.candles} (+${state.candles * 10}%)`);
   if (state.chanted) parts.push("🗣️ +15");
   if (state.destroyed) parts.push(`💥 +${Math.min(state.destroyed, 3) * 30}`);
+  if (state.ghosts) parts.push(`👻 +${Math.min(state.ghosts, 5) * 10}`);
+  if (stats.talis.length) parts.push(`🧧 +${stats.talis.length}`);
   if (fortune.bonus) parts.push(`🌙 ${fortune.bonus > 0 ? "+" : ""}${fortune.bonus}`);
   $("bonusLine").textContent = armed
     ? `최종 저주력 ${finalPower()}${parts.length ? " · " + parts.join(" · ") : ""}`
@@ -816,6 +868,8 @@ function resetRitual() {
   state.hp = HP_MAX;
   state.combo = 0;
   state.destroyed = 0;
+  state.ghosts = 0;
+  setFace("normal");
   candleBox.querySelectorAll(".rc").forEach((c) => c.classList.remove("lit"));
   chantBtn.classList.remove("done");
   $("chantFill").style.width = "0";
@@ -861,12 +915,15 @@ function cast() {
   const victim = reflected ? "나 자신" : state.target;
   const count = p >= 120 ? 4 : p >= 90 ? 3 : p >= 50 ? 2 : 1;
   const curses = pickN(pool, Math.min(count, pool.length));
-  const days = p >= 120 ? "100일" : `${Math.max(1, Math.round(p / 10))}일`;
+  const daysNum = p >= 120 ? 100 : Math.max(1, Math.round(p / 10));
+  const days = `${daysNum}일`;
   const r = rank(p);
   const side = p >= 90 && !reflected ? pick(SIDE_EFFECTS) : null;
   const unlock = pick(UNLOCKS);
   const typeName = state.type === "custom" ? "나만의 저주" : CURSE_TYPES.find((t) => t.id === state.type).name + "의 저주";
   lastCurse = { victim, curses, days, rank: r, p, side, unlock, reflected, typeName };
+  const drop = dropTalisman(p);
+  const rar = RARITY[drop.t.r];
 
   const scroll = $("scroll");
   scroll.classList.toggle("reflect", reflected);
@@ -877,6 +934,7 @@ function cast() {
     <ul>${curses.map((c) => `<li>${escapeHTML(c)}</li>`).join("")}</ul>
     ${side ? `<p class="extra">⚠️ 부작용: ${side}</p>` : ""}
     <p class="extra">🔓 해제 조건: ${unlock}</p>
+    <p class="extra talis-drop">🧧 부적 획득: <b style="color:${rar.color}">[${rar.name}]</b> ${drop.t.icon} ${drop.t.name}${drop.isNew ? " <b>NEW!</b>" : ""}</p>
     <p class="seal">— ${typeName} · 저주력 ${p} · 呪印 —</p>`;
   $("result").hidden = false;
 
@@ -901,6 +959,20 @@ function cast() {
   if (!stats.skins.includes(state.skin)) stats.skins.push(state.skin);
   checkBadges({ p, candles: state.candles });
   saveStats();
+
+  addActive({ victim, rank: r, curse: curses[0], days: daysNum });
+  if (drop.isNew) {
+    setTimeout(SFX.talis, 900);
+    toast(`🧧 새 부적: [${rar.name}] ${drop.t.icon} ${drop.t.name}`);
+  }
+  if (p >= 120) setTimeout(() => lightning(true), 200);
+  if (castByShake) {
+    stats.shakeCasts++;
+    castByShake = false;
+  }
+  checkBadges({ p, candles: state.candles });
+  saveStats();
+  renderTalis();
 
   addLog(`${reflected ? "🪞 " : ""}${victim} — ${r} (${curses[0]}${curses.length > 1 ? " 외" : ""})`);
   $("result").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1061,6 +1133,11 @@ function checkBadges(ctxInfo = {}) {
     destroy: stats.destroys >= 1,
     pins500: stats.pins >= 500,
     author: stats.authored,
+    ghost10: stats.ghosts >= 10,
+    gold: stats.goldTalis,
+    talisAll: stats.talis.length >= TALISMANS.length,
+    mercy: stats.mercy >= 1,
+    shake: stats.shakeCasts >= 1,
     allSkins: stats.skins.length >= SKINS.length,
   };
   BADGES.forEach((b) => {
@@ -1157,3 +1234,179 @@ $("customList").addEventListener("click", (e) => {
   renderCustom();
 });
 renderCustom();
+
+// ── 유령 ──
+let ghostTimer = 0;
+function scheduleGhost(delay) {
+  clearTimeout(ghostTimer);
+  ghostTimer = setTimeout(spawnGhost, delay ?? 20000 + rand(25000));
+}
+function spawnGhost() {
+  if (!state.target || document.hidden) return scheduleGhost();
+  const g = document.createElement("button");
+  g.type = "button";
+  g.className = "ghost-float " + (Math.random() < 0.5 ? "ltr" : "rtl");
+  g.textContent = "👻";
+  g.setAttribute("aria-label", "유령 잡기");
+  g.style.top = 12 + rand(60) + "vh";
+  const grab = (e) => {
+    e.preventDefault();
+    if (g.dataset.caught) return;
+    g.dataset.caught = "1";
+    const r = g.getBoundingClientRect();
+    g.className = "ghost-float caught";
+    g.style.left = r.left + "px";
+    g.style.top = r.top + "px";
+    g.style.right = "auto";
+    catchGhost();
+  };
+  g.addEventListener("pointerdown", grab);
+  g.addEventListener("click", grab);
+  g.addEventListener("animationend", () => g.remove());
+  document.body.append(g);
+  SFX.ghost();
+  scheduleGhost();
+}
+function catchGhost() {
+  state.ghosts++;
+  stats.ghosts++;
+  SFX.ghostCatch();
+  vibrate(50);
+  toast(state.ghosts <= 5 ? `👻 유령을 잡았다! 원한 +10 (${state.ghosts}마리)` : "👻 유령을 잡았다! (보너스는 5마리까지)");
+  say(pick(["유령이다!", "나보다 불쌍한 녀석…", "으스스해…"]), true);
+  updateMeter();
+  checkBadges();
+  saveStats();
+}
+
+// ── 번개 ──
+function lightning(sound) {
+  const l = $("lightning");
+  l.classList.remove("on");
+  void l.offsetWidth;
+  l.classList.add("on");
+  if (sound && bgm.on) setTimeout(SFX.thunder, 250 + rand(600));
+}
+(function storm() {
+  setTimeout(() => {
+    if (!document.hidden && Math.random() < 0.7) lightning(true);
+    storm();
+  }, 25000 + rand(35000));
+})();
+
+// ── 부적 도감 ──
+function dropTalisman(p) {
+  const roll = Math.random() * 100 - Math.min(p, 150) / 10;
+  const tier = roll < 3 ? "l" : roll < 13 ? "e" : roll < 40 ? "r" : "c";
+  const t = pick(TALISMANS.filter((x) => x.r === tier));
+  const isNew = !stats.talis.includes(t.id);
+  if (isNew) stats.talis.push(t.id);
+  if (tier === "l") stats.goldTalis = true;
+  return { t, isNew };
+}
+function renderTalis() {
+  $("talisCount").textContent = `${stats.talis.length} / ${TALISMANS.length} · 도감 보너스 +${stats.talis.length}`;
+  $("talisGrid").innerHTML = TALISMANS.map((t) => {
+    const got = stats.talis.includes(t.id);
+    const r = RARITY[t.r];
+    return `<li class="${got ? "got" : ""}" style="--rc:${r.color}"><span class="ico">${got ? t.icon : "🧧"}</span>${got ? t.name : "???"}<small>${r.name}</small></li>`;
+  }).join("");
+}
+renderTalis();
+updateMeter();
+
+// ── 진행 중인 저주 ──
+const ACTIVE_KEY = "noroii-active";
+function addActive({ victim, rank, curse, days }) {
+  const list = load(ACTIVE_KEY, []);
+  const now = Date.now();
+  list.unshift({ id: now + "-" + rand(1e6), victim, rank, curse, start: now, end: now + days * 864e5 });
+  save(ACTIVE_KEY, list.slice(0, 20));
+  renderActive();
+}
+function fmtLeft(ms) {
+  const m = Math.floor(ms / 60000);
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d) return `${d}일 ${h}시간 남음`;
+  if (h) return `${h}시간 ${m % 60}분 남음`;
+  return `${Math.max(1, m)}분 남음`;
+}
+function renderActive() {
+  const list = load(ACTIVE_KEY, []);
+  const ul = $("activeList");
+  if (!list.length) {
+    ul.innerHTML = '<li class="empty">걸려 있는 저주가 없다. 평화롭다…</li>';
+    return;
+  }
+  const now = Date.now();
+  ul.innerHTML = list.map((a) => {
+    const done = now >= a.end;
+    const pct = Math.min(100, ((now - a.start) / (a.end - a.start)) * 100);
+    return `<li class="${done ? "done" : ""}">
+      <div class="arow"><span><b>${escapeHTML(a.victim)}</b> · ${escapeHTML(a.rank)}<br>${escapeHTML(a.curse)}</span>
+      ${done ? '<span class="left">만료됨 ✔</span>' : `<span class="left">${fmtLeft(a.end - now)}</span><button type="button" class="release" data-id="${escapeHTML(a.id)}">🔓 풀어주기</button>`}</div>
+      <div class="abar"><div style="width:${pct}%"></div></div></li>`;
+  }).join("");
+}
+$("activeList").addEventListener("click", (e) => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  save(ACTIVE_KEY, load(ACTIVE_KEY, []).filter((a) => a.id !== id));
+  stats.mercy++;
+  SFX.salt();
+  toast(pick(["🕊️ 저주를 풀어줬다. 착하다", "🕊️ 자비를 베풀었다", "🕊️ 오늘은 봐주기로 했다"]));
+  checkBadges();
+  saveStats();
+  renderActive();
+});
+$("cleanActive").addEventListener("click", () => {
+  const now = Date.now();
+  save(ACTIVE_KEY, load(ACTIVE_KEY, []).filter((a) => a.end > now));
+  renderActive();
+});
+renderActive();
+setInterval(renderActive, 60000);
+
+// ── 폰 흔들어서 발동 ──
+let castByShake = false;
+let shakeOn = false;
+let shakeHits = [];
+let shakeCool = 0;
+if ("DeviceMotionEvent" in window && matchMedia("(pointer: coarse)").matches) $("shakeBtn").hidden = false;
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if (!a) return;
+  if (Math.hypot(a.x || 0, a.y || 0, a.z || 0) < 25) return;
+  const now = performance.now();
+  shakeHits = shakeHits.filter((t) => now - t < 800);
+  shakeHits.push(now);
+  if (shakeHits.length < 3 || now < shakeCool) return;
+  shakeHits = [];
+  shakeCool = now + 2500;
+  if ($("castBtn").disabled) return say("흔들지 마! 어지러워…", true);
+  castByShake = true;
+  cast();
+}
+
+$("shakeBtn").addEventListener("click", async () => {
+  const btn = $("shakeBtn");
+  if (shakeOn) {
+    window.removeEventListener("devicemotion", onMotion);
+    shakeOn = false;
+  } else {
+    try {
+      if (typeof DeviceMotionEvent.requestPermission === "function" && (await DeviceMotionEvent.requestPermission()) !== "granted") {
+        return toast("흔들기 권한이 거부됐다");
+      }
+    } catch (_) {
+      return toast("이 기기에서는 흔들기를 쓸 수 없다");
+    }
+    window.addEventListener("devicemotion", onMotion);
+    shakeOn = true;
+    toast("📳 폰을 세게 흔들면 저주가 발동된다");
+  }
+  btn.classList.toggle("on", shakeOn);
+  btn.textContent = `📳 폰 흔들어서 발동하기: ${shakeOn ? "켜짐" : "꺼짐"}`;
+});

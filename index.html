@@ -94,10 +94,24 @@
             </g>
             <g id="face" stroke="#3b2510" stroke-width="2" fill="none" pointer-events="none">
               <path d="M100 112 V220" stroke-dasharray="5 5"/>
-              <path d="M82 50 l12 12 M94 50 l-12 12"/>
-              <path d="M106 50 l12 12 M118 50 l-12 12"/>
-              <path d="M80 85 q20 -10 40 0"/>
-              <path d="M84 82 v6 M92 79 v6 M100 78 v6 M108 79 v6 M116 82 v6"/>
+              <g class="f-normal">
+                <path d="M82 50 l12 12 M94 50 l-12 12"/>
+                <path d="M106 50 l12 12 M118 50 l-12 12"/>
+                <path d="M80 85 q20 -10 40 0"/>
+                <path d="M84 82 v6 M92 79 v6 M100 78 v6 M108 79 v6 M116 82 v6"/>
+              </g>
+              <g class="f-hurt">
+                <path d="M82 50 l12 6 l-12 6"/>
+                <path d="M118 50 l-12 6 l12 6"/>
+                <path d="M80 87 q5 -6 10 0 t10 0 t10 0 t10 0"/>
+                <path d="M134 38 q5 8 0 12 q-5 -4 0 -12z" fill="#7ec8ff" stroke="#3a7ab0" stroke-width="1"/>
+              </g>
+              <g class="f-crit">
+                <circle cx="88" cy="56" r="7"/><circle cx="88" cy="56" r="3"/>
+                <circle cx="112" cy="56" r="7"/><circle cx="112" cy="56" r="3"/>
+                <ellipse cx="100" cy="88" rx="7" ry="9" fill="#3b2510"/>
+                <path d="M84 66 q-3 8 0 12 q3 -4 0 -12z M116 66 q-3 8 0 12 q3 -4 0 -12z" fill="#7ec8ff" stroke="#3a7ab0" stroke-width="1"/>
+              </g>
             </g>
             <rect x="66" y="150" width="68" height="34" fill="#f2e6c9" stroke="#3b2510" stroke-width="2" pointer-events="none" transform="rotate(-4 100 167)"/>
             <text id="dollName" x="100" y="173" text-anchor="middle" pointer-events="none" transform="rotate(-4 100 167)">???</text>
@@ -123,6 +137,7 @@
         <span class="chant-label" id="chantLabel">🗣️ 꾹 눌러서 주문 외우기</span>
       </button>
       <p class="incant" id="incant"></p>
+      <button id="shakeBtn" type="button" class="link-btn shake-btn" hidden>📳 폰 흔들어서 발동하기: 꺼짐</button>
 
       <div class="actions">
         <button id="resetBtn" class="btn ghost">🧹 처음부터</button>
@@ -147,6 +162,17 @@
       <button id="againBtn" class="btn wide">🔁 같은 의식으로 다시 저주</button>
     </section>
 
+    <section class="panel active-curses">
+      <h2>⏳ 진행 중인 저주 <button id="cleanActive" type="button" class="link-btn">만료 정리</button></h2>
+      <ul id="activeList"></ul>
+    </section>
+
+    <section class="panel talis">
+      <h2>🧧 부적 도감 <small id="talisCount"></small></h2>
+      <p class="hint">저주를 내릴 때마다 부적이 하나 떨어진다. 모은 부적 수만큼 저주력 +1, 저주력이 높을수록 희귀한 부적이 잘 나온다.</p>
+      <ul class="talis-grid" id="talisGrid"></ul>
+    </section>
+
     <section class="panel log">
       <h2>📜 저주 기록부 <button id="clearLog" class="link-btn">지우기</button></h2>
       <ul id="logList"><li class="empty">아직 아무도 저주받지 않았다…</li></ul>
@@ -157,6 +183,7 @@
     ※ 이 사이트는 순전히 재미용입니다. 실제 효과는 0%이며, 스트레스 해소용으로만 사용하세요.
   </footer>
 
+  <div class="lightning" id="lightning"></div>
   <div class="flash" id="flash"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="script.js"></script>
