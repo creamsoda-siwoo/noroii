@@ -13,7 +13,7 @@
 </head>
 <body>
   <div class="fog"></div>
-  <button id="soundBtn" class="sound-btn" aria-label="배경음 켜기" title="배경음">🔇</button>
+  <button id="soundBtn" class="sound-btn" aria-label="브금 끄기" title="브금">🎵</button>
 
   <header>
     <div class="candles"><span class="candle"></span><span class="candle"></span></div>
@@ -29,8 +29,15 @@
         <input id="target" type="text" maxlength="20" placeholder="예: 내 알람시계" autocomplete="off">
       </label>
       <div class="field">
-        <span class="field-label">저주의 종류</span>
+        <span class="field-label">저주의 종류 <button id="rouletteBtn" type="button" class="link-btn">🎰 랜덤 뽑기</button></span>
         <div class="chips" id="typeChips"></div>
+        <div class="custom" id="customBox" hidden>
+          <div class="custom-row">
+            <input id="customInput" type="text" maxlength="40" placeholder="예: 치약 뚜껑이 항상 사라진다" autocomplete="off">
+            <button id="customAdd" type="button" class="btn">추가</button>
+          </div>
+          <ul id="customList"></ul>
+        </div>
       </div>
       <div class="field">
         <span class="field-label">인형 고르기</span>
@@ -47,6 +54,8 @@
       <div class="altar">
         <div class="ritual-candles" id="ritualCandles" aria-label="촛불을 켜면 저주력이 강해진다"></div>
         <div class="doll-wrap">
+          <div class="bubble" id="bubble"></div>
+          <div class="combo" id="combo"></div>
           <svg id="doll" viewBox="0 0 200 300" aria-label="저주인형">
             <defs>
               <pattern id="pat-straw" width="6" height="6" patternUnits="userSpaceOnUse">
@@ -101,6 +110,11 @@
         <span>저주력</span>
         <div class="bar"><div id="meterFill"></div></div>
         <span id="meterNum">0%</span>
+      </div>
+      <div class="meter hp">
+        <span>내구도</span>
+        <div class="bar"><div id="hpFill"></div></div>
+        <span id="hpNum">100%</span>
       </div>
       <p class="bonus" id="bonusLine"></p>
 

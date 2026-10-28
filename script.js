@@ -8,6 +8,7 @@ const CURSE_TYPES = [
   { id: "game", name: "게임", icon: "🎮" },
   { id: "love", name: "연애", icon: "💔" },
   { id: "body", name: "몸", icon: "🤧" },
+  { id: "custom", name: "나만의", icon: "✍️" },
 ];
 
 const CURSES = {
@@ -109,6 +110,8 @@ const CURSES = {
   ],
 };
 
+CURSES.custom = load("noroii-custom", []);
+
 const UNLOCKS = [
   "고양이를 세 번 쓰다듬으면 풀린다",
   "진심으로 '미안해'라고 말하면 풀린다",
@@ -137,6 +140,21 @@ const INCANTATIONS = [
   "치킨 퍽퍽살… 퍽퍽살… 퍽퍽살…",
 ];
 
+const PART_LINES = {
+  머리: ["아야! 머리는 반칙이야!", "띠용…", "생각이 안 나…", "두통이 몰려온다…"],
+  몸통: ["윽, 배가…", "속이 울렁거려…", "거긴 간지러워!", "꼬르륵…"],
+  왼팔: ["팔이 저려!", "왼팔이 찌릿!", "숟가락을 못 들겠어…"],
+  오른팔: ["밥 먹는 손이야!", "오른팔이 찌릿!", "마우스를 못 잡겠어!"],
+  왼다리: ["다리에 쥐 났어!", "절뚝절뚝…", "무릎이 시려…"],
+  오른다리: ["새끼발가락은 안 돼!", "걸을 수가 없어!", "발바닥이 간지러워!"],
+};
+const TOOL_LINES = {
+  nail: ["못은 너무하잖아!!", "쾅?! 쾅?!", "공구는 반칙이야!"],
+  fire: ["앗 뜨거!!", "탄 냄새 나…", "물! 물 좀!"],
+  salt: ["휴, 시원하다…", "고마워…", "짜다…"],
+};
+const LOW_HP_LINES = ["살려줘…", "솜이 삐져나와…", "이제 그만…", "실밥이 터질 것 같아!"];
+
 const FORTUNES = [
   { t: "대길 · 저주력이 넘치는 날 (+10)", bonus: 10, rm: 1 },
   { t: "길 · 촛불이 잘 타는 날 (+5)", bonus: 5, rm: 1 },
@@ -163,7 +181,7 @@ const TOOLS = [
 
 const PART_BONUS = { 머리: 20, 몸통: 15, 왼팔: 10, 오른팔: 10, 왼다리: 10, 오른다리: 10 };
 const PIN_COLORS = ["#b3141b", "#1b1b1b", "#5a1a8a", "#d4a017", "#2a6e3f"];
-const MAX_MARKS = 15;
+const HP_MAX = 600;
 const SITE_URL = "https://noroii.vercel.app";
 
 const BADGES = [
@@ -179,6 +197,10 @@ const BADGES = [
   { id: "reflect", icon: "🪞", name: "업보", desc: "저주가 튕겨나왔다" },
   { id: "allTypes", icon: "📚", name: "저주 백과", desc: "모든 종류 사용" },
   { id: "allSkins", icon: "🧸", name: "인형 수집가", desc: "모든 인형 사용" },
+  { id: "combo20", icon: "🌀", name: "광란의 연타", desc: "20콤보 달성" },
+  { id: "destroy", icon: "💥", name: "인형 박살", desc: "인형을 터뜨렸다" },
+  { id: "pins500", icon: "🦔", name: "고슴도치", desc: "바늘·못 500개" },
+  { id: "author", icon: "✍️", name: "저주 작가", desc: "나만의 저주 작성" },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -196,6 +218,10 @@ const state = {
   candles: 0,
   chanted: false,
   saltUsed: false,
+  hp: HP_MAX,
+  combo: 0,
+  lastStab: 0,
+  destroyed: 0,
 };
 
 // ── 저장소 ──
@@ -206,7 +232,7 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
 }
 const stats = Object.assign(
-  { curses: 0, pins: 0, burns: 0, salts: 0, chants: 0, reflected: 0, types: [], skins: [], badges: [] },
+  { curses: 0, pins: 0, burns: 0, salts: 0, chants: 0, reflected: 0, maxCombo: 0, destroys: 0, authored: false, types: [], skins: [], badges: [] },
   load("noroii-stats", {}),
 );
 
@@ -268,49 +294,122 @@ const SFX = {
   reflect: () => { tone(900, 0.9, "sawtooth", 0.08, 80); tone(1200, 0.6, "sine", 0.06, 300, 0.2); },
   chantDone: () => [330, 415, 494].forEach((f, i) => tone(f, 0.8, "triangle", 0.07, 0, i * 0.08)),
   badge: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, "sine", 0.07, 0, i * 0.09)),
+  burst: () => { noise(0.9, 0.5, 400); tone(80, 1.2, "sawtooth", 0.15, 30); tone(1400, 0.4, "square", 0.04, 200, 0.1); },
+  tick: (i) => tone(500 + (i % 4) * 120, 0.05, "square", 0.03),
 };
 
-// ── 배경음 (낮은 웅웅거림) ──
-let drone = null;
-$("soundBtn").addEventListener("click", () => {
-  if (drone) {
-    drone.gain.gain.setTargetAtTime(0, audio.currentTime, 0.3);
-    const d = drone;
-    setTimeout(() => d.nodes.forEach((n) => n.stop()), 1200);
-    drone = null;
-    $("soundBtn").textContent = "🔇";
-    $("soundBtn").setAttribute("aria-label", "배경음 켜기");
-    return;
+// ── 브금 (WebAudio로 실시간 생성하는 오르골) ──
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const PROG = [[57, 60, 64], [53, 57, 60], [50, 53, 57], [52, 56, 59]]; // Am F Dm E
+const ARP = [0, 1, 2, 3, 2, 1, 0, 1]; // 3 = 근음 한 옥타브 위
+const PENTA = [69, 72, 74, 76, 79, 81];
+const STEP = 60 / 76 / 2;
+const bgm = { on: false, timer: 0, step: 0, next: 0, nodes: null };
+
+function bgmNodes() {
+  const a = ctx();
+  const out = a.createGain();
+  out.gain.value = 0;
+  out.connect(a.destination);
+  const input = a.createGain();
+  const delay = a.createDelay();
+  const fb = a.createGain();
+  const wet = a.createGain();
+  delay.delayTime.value = STEP * 3;
+  fb.gain.value = 0.35;
+  wet.gain.value = 0.4;
+  input.connect(out);
+  input.connect(delay);
+  delay.connect(fb).connect(delay);
+  delay.connect(wet).connect(out);
+  return { out, input };
+}
+
+function voice(freq, t, vol, len, type = "sine", attack = 0.005) {
+  const o = audio.createOscillator();
+  const g = audio.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(g).connect(bgm.nodes.input);
+  o.start(t);
+  o.stop(t + len + 0.05);
+}
+
+function boxNote(m, t, vol = 0.05, len = 1.4) {
+  [1, 2.003, 3.01].forEach((h, i) => voice(mtof(m) * h, t, vol / (i * 2 + 1), len / (i + 1)));
+}
+
+function bell(m, t) {
+  [1, 2.76, 5.4].forEach((h, i) => voice(mtof(m) * h, t, 0.07 / (i + 1), 4 / (i + 1)));
+}
+
+function scheduleStep(i, t) {
+  const s = i % 8;
+  const ch = PROG[Math.floor(i / 8) % PROG.length];
+  boxNote((ARP[s] === 3 ? ch[0] + 12 : ch[ARP[s]]) + 12, t);
+  if (s === 0) voice(mtof(ch[0] - 24), t, 0.05, STEP * 8, "triangle", 0.6);
+  if ((s === 2 || s === 6) && Math.random() < 0.35) boxNote(pick(PENTA) + 12, t, 0.03, 2);
+  if (i % 32 === 0) bell(40, t);
+}
+
+function bgmTick() {
+  while (bgm.next < audio.currentTime + 0.2) {
+    scheduleStep(bgm.step++, bgm.next);
+    bgm.next += STEP;
   }
+}
+
+function updateSoundBtn() {
+  $("soundBtn").textContent = bgm.on ? "🎵" : "🔇";
+  $("soundBtn").setAttribute("aria-label", bgm.on ? "브금 끄기" : "브금 켜기");
+}
+
+function startBgm() {
+  if (bgm.on) return;
   try {
     const a = ctx();
-    const gain = a.createGain();
-    const filter = a.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 260;
-    gain.gain.value = 0;
-    gain.gain.setTargetAtTime(0.05, a.currentTime, 1);
-    const nodes = [55, 58.3, 82.4].map((f) => {
-      const o = a.createOscillator();
-      o.type = "sawtooth";
-      o.frequency.value = f;
-      o.connect(filter);
-      o.start();
-      return o;
-    });
-    const lfo = a.createOscillator();
-    const lfoGain = a.createGain();
-    lfo.frequency.value = 0.08;
-    lfoGain.gain.value = 120;
-    lfo.connect(lfoGain).connect(filter.frequency);
-    lfo.start();
-    nodes.push(lfo);
-    filter.connect(gain).connect(a.destination);
-    drone = { gain, nodes };
-    $("soundBtn").textContent = "🔊";
-    $("soundBtn").setAttribute("aria-label", "배경음 끄기");
-  } catch (_) {}
+    if (!bgm.nodes) bgm.nodes = bgmNodes();
+    bgm.nodes.out.gain.cancelScheduledValues(a.currentTime);
+    bgm.nodes.out.gain.setTargetAtTime(1, a.currentTime, 0.8);
+    bgm.next = a.currentTime + 0.1;
+    bgm.timer = setInterval(bgmTick, 50);
+    bgm.on = true;
+  } catch (_) { return; }
+  updateSoundBtn();
+}
+
+function stopBgm() {
+  if (!bgm.on) return;
+  clearInterval(bgm.timer);
+  bgm.nodes.out.gain.setTargetAtTime(0, audio.currentTime, 0.2);
+  bgm.on = false;
+  updateSoundBtn();
+}
+
+$("soundBtn").addEventListener("click", () => {
+  if (bgm.on) stopBgm();
+  else startBgm();
+  save("noroii-bgm", bgm.on);
 });
+
+// 브라우저는 사용자가 한 번 터치/클릭해야 소리를 허용하므로 첫 입력 때 브금 시작
+function autoStartBgm(e) {
+  document.removeEventListener("pointerdown", autoStartBgm, true);
+  document.removeEventListener("keydown", autoStartBgm, true);
+  if (e.target.closest && e.target.closest("#soundBtn")) return;
+  if (load("noroii-bgm", true)) startBgm();
+}
+document.addEventListener("pointerdown", autoStartBgm, true);
+document.addEventListener("keydown", autoStartBgm, true);
+document.addEventListener("visibilitychange", () => {
+  if (!audio) return;
+  if (document.hidden) audio.suspend();
+  else audio.resume();
+});
+$("soundBtn").textContent = load("noroii-bgm", true) ? "🎵" : "🔇";
 
 // ── 선택 칩 ──
 function makeChips(el, items, current, onPick, extra) {
@@ -329,7 +428,10 @@ function makeChips(el, items, current, onPick, extra) {
     el.append(b);
   });
 }
-makeChips($("typeChips"), CURSE_TYPES, state.type, (id) => (state.type = id));
+makeChips($("typeChips"), CURSE_TYPES, state.type, (id) => {
+  state.type = id;
+  $("customBox").hidden = id !== "custom";
+});
 makeChips($("skinChips"), SKINS, state.skin, (id) => { state.skin = id; applySkin(); });
 makeChips($("tools"), TOOLS, state.tool, (id) => {
   state.tool = id;
@@ -430,18 +532,13 @@ function el(tag, attrs) {
   return n;
 }
 
-doll.addEventListener("click", (e) => {
-  const part = e.target.dataset && e.target.dataset.part;
-  if (!part) return;
-  if (!state.target) return nudge();
-  const { x, y } = svgPoint(e);
-
+function stabAt(part, x, y) {
   if (state.tool === "salt") return purify(x, y);
 
-  if (state.marks.length >= MAX_MARKS) {
-    $("dollHint").textContent = "더 이상 자리가 없다. 저주를 발동하라!";
-    return;
-  }
+  const now = performance.now();
+  state.combo = now - state.lastStab < 700 ? state.combo + 1 : 1;
+  state.lastStab = now;
+  const comboMul = 1 + Math.min(state.combo, 20) * 0.05;
 
   const base = PART_BONUS[part];
   const g = el("g", { class: "mark" });
@@ -479,14 +576,103 @@ doll.addEventListener("click", (e) => {
     vibrate(80);
     shake();
   }
+  gain = Math.round(gain * comboMul);
   marksG.insertBefore(g, marksG.firstChild);
   state.marks.push({ x, y, gain, g });
   state.power = Math.min(100, state.power + gain);
-  $("dollHint").textContent = `${part}에 ${TOOLS.find((t) => t.id === state.tool).name}! (${state.marks.length}/${MAX_MARKS})`;
+  if (state.combo > stats.maxCombo) stats.maxCombo = state.combo;
+  if (state.combo >= 3) showCombo(state.combo);
+
+  const toolName = TOOLS.find((t) => t.id === state.tool).name;
+  $("dollHint").textContent = `${part}에 ${toolName}! (총 ${state.marks.length}개${state.combo >= 3 ? ` · ${state.combo}콤보 ×${comboMul.toFixed(2)}` : ""})`;
+
+  state.hp -= gain;
+  if (state.hp <= 0) {
+    burst();
+  } else if (state.hp < HP_MAX * 0.25 && Math.random() < 0.4) {
+    say(pick(LOW_HP_LINES));
+  } else if (Math.random() < 0.45) {
+    say(pick(TOOL_LINES[state.tool] && Math.random() < 0.5 ? TOOL_LINES[state.tool] : PART_LINES[part]));
+  }
   updateMeter();
   checkBadges();
   saveStats();
+}
+
+// 꾹 누른 채 문지르면 계속 꽂힌다
+let dragging = false;
+let lastDrag = { x: 0, y: 0, t: 0 };
+doll.addEventListener("pointerdown", (e) => {
+  const part = e.target.dataset && e.target.dataset.part;
+  if (!part) return;
+  if (!state.target) return nudge();
+  e.preventDefault();
+  dragging = true;
+  try { doll.setPointerCapture(e.pointerId); } catch (_) {}
+  const { x, y } = svgPoint(e);
+  lastDrag = { x, y, t: performance.now() };
+  stabAt(part, x, y);
 });
+doll.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  const { x, y } = svgPoint(e);
+  const now = performance.now();
+  if (now - lastDrag.t < 90 || Math.hypot(x - lastDrag.x, y - lastDrag.y) < 12) return;
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const part = hit && hit.dataset && hit.dataset.part;
+  if (!part) return;
+  lastDrag = { x, y, t: now };
+  stabAt(part, x, y);
+});
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => doll.addEventListener(ev, () => (dragging = false)));
+
+let comboTimer = 0;
+function showCombo(n) {
+  const c = $("combo");
+  c.textContent = `${n} COMBO!`;
+  c.classList.toggle("hot", n >= 10);
+  c.classList.remove("on");
+  void c.offsetWidth;
+  c.classList.add("on");
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => c.classList.remove("on"), 700);
+}
+
+let bubbleTimer = 0;
+let lastTalk = 0;
+function say(text, force) {
+  const now = performance.now();
+  if (!force && now - lastTalk < 900) return;
+  lastTalk = now;
+  const b = $("bubble");
+  b.textContent = text;
+  b.classList.add("on");
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => b.classList.remove("on"), 1400);
+}
+
+function burst() {
+  state.destroyed++;
+  stats.destroys++;
+  state.marks.forEach((m) => m.g.remove());
+  state.marks = [];
+  state.hp = HP_MAX;
+  state.power = 100;
+  dragging = false;
+  for (let i = 0; i < 16; i++) popAt(20 + rand(160), 20 + rand(260), pick(["☁️", "🧵", "💥", "✨", "🪡"]));
+  SFX.burst();
+  vibrate([100, 50, 200]);
+  const flash = $("flash");
+  flash.classList.remove("on", "purple");
+  void flash.offsetWidth;
+  flash.classList.add("on");
+  say("으아아악!! 💥", true);
+  doll.classList.remove("resew");
+  void doll.getBBox();
+  doll.classList.add("resew");
+  toast(`💥 인형이 터졌다! 다시 꿰맸다 (파괴 보너스 +30, ${state.destroyed}회)`);
+  $("dollHint").textContent = "인형이 터졌다… 그런데 저절로 다시 꿰매졌다. 계속 찌를 수 있다.";
+}
 
 function purify(x, y) {
   let best = -1;
@@ -506,7 +692,9 @@ function purify(x, y) {
   state.saltUsed = true;
   stats.salts++;
   SFX.salt();
-  $("dollHint").textContent = `정화 완료. 저주력이 ${m.gain} 줄었다. (${state.marks.length}/${MAX_MARKS})`;
+  state.hp = Math.min(HP_MAX, state.hp + m.gain);
+  if (Math.random() < 0.5) say(pick(TOOL_LINES.salt));
+  $("dollHint").textContent = `정화 완료. 저주력이 ${m.gain} 줄었다. (남은 자국 ${state.marks.length}개)`;
   updateMeter();
   checkBadges();
   saveStats();
@@ -593,18 +781,27 @@ function typeOut(node, text) {
 
 // ── 저주력 계산 ──
 function finalPower() {
-  return Math.max(0, Math.round(state.power * (1 + 0.1 * state.candles) + (state.chanted ? 15 : 0) + fortune.bonus));
+  const destroyBonus = Math.min(state.destroyed, 3) * 30;
+  return Math.max(0, Math.round(state.power * (1 + 0.1 * state.candles) + (state.chanted ? 15 : 0) + destroyBonus + fortune.bonus));
 }
 
 function updateMeter() {
   $("meterFill").style.width = state.power + "%";
   $("meterNum").textContent = state.power + "%";
-  $("castBtn").disabled = state.marks.length === 0;
+  const hpPct = Math.round((state.hp / HP_MAX) * 100);
+  const hpFill = $("hpFill");
+  hpFill.style.width = hpPct + "%";
+  hpFill.classList.toggle("low", hpPct < 50 && hpPct >= 25);
+  hpFill.classList.toggle("crit", hpPct < 25);
+  $("hpNum").textContent = hpPct + "%";
+  const armed = state.marks.length > 0 || state.destroyed > 0;
+  $("castBtn").disabled = !armed;
   const parts = [];
   if (state.candles) parts.push(`🕯️×${state.candles} (+${state.candles * 10}%)`);
   if (state.chanted) parts.push("🗣️ +15");
+  if (state.destroyed) parts.push(`💥 +${Math.min(state.destroyed, 3) * 30}`);
   if (fortune.bonus) parts.push(`🌙 ${fortune.bonus > 0 ? "+" : ""}${fortune.bonus}`);
-  $("bonusLine").textContent = state.marks.length
+  $("bonusLine").textContent = armed
     ? `최종 저주력 ${finalPower()}${parts.length ? " · " + parts.join(" · ") : ""}`
     : parts.length ? "보너스: " + parts.join(" · ") : "";
 }
@@ -616,6 +813,9 @@ function resetRitual() {
   state.chanted = false;
   state.saltUsed = false;
   state.candles = 0;
+  state.hp = HP_MAX;
+  state.combo = 0;
+  state.destroyed = 0;
   candleBox.querySelectorAll(".rc").forEach((c) => c.classList.remove("lit"));
   chantBtn.classList.remove("done");
   $("chantFill").style.width = "0";
@@ -649,17 +849,23 @@ function escapeHTML(s) {
 let lastCurse = null;
 
 function cast() {
-  if (!state.marks.length) return;
+  if (!state.marks.length && !state.destroyed) return;
+  const pool = CURSES[state.type];
+  if (!pool.length) {
+    toast("✍️ 나만의 저주를 먼저 하나 이상 적어주세요");
+    $("customInput").focus();
+    return;
+  }
   const p = finalPower();
   const reflected = Math.random() < 0.08 * fortune.rm;
   const victim = reflected ? "나 자신" : state.target;
   const count = p >= 120 ? 4 : p >= 90 ? 3 : p >= 50 ? 2 : 1;
-  const curses = pickN(CURSES[state.type], count);
+  const curses = pickN(pool, Math.min(count, pool.length));
   const days = p >= 120 ? "100일" : `${Math.max(1, Math.round(p / 10))}일`;
   const r = rank(p);
   const side = p >= 90 && !reflected ? pick(SIDE_EFFECTS) : null;
   const unlock = pick(UNLOCKS);
-  const typeName = CURSE_TYPES.find((t) => t.id === state.type).name;
+  const typeName = state.type === "custom" ? "나만의 저주" : CURSE_TYPES.find((t) => t.id === state.type).name + "의 저주";
   lastCurse = { victim, curses, days, rank: r, p, side, unlock, reflected, typeName };
 
   const scroll = $("scroll");
@@ -668,10 +874,10 @@ function cast() {
     ${reflected ? '<p class="extra">🪞 저주가 거울에 튕겨 <b>당신에게</b> 돌아왔다!</p>' : ""}
     <p class="title${p >= 120 ? " forbidden" : ""}">${r}</p>
     <p><b>${escapeHTML(victim)}</b>에게 앞으로 <b>${days}</b> 동안…</p>
-    <ul>${curses.map((c) => `<li>${c}</li>`).join("")}</ul>
+    <ul>${curses.map((c) => `<li>${escapeHTML(c)}</li>`).join("")}</ul>
     ${side ? `<p class="extra">⚠️ 부작용: ${side}</p>` : ""}
     <p class="extra">🔓 해제 조건: ${unlock}</p>
-    <p class="seal">— ${typeName}의 저주 · 저주력 ${p} · 呪印 —</p>`;
+    <p class="seal">— ${typeName} · 저주력 ${p} · 呪印 —</p>`;
   $("result").hidden = false;
 
   const flash = $("flash");
@@ -787,7 +993,7 @@ $("imgBtn").addEventListener("click", async () => {
   g.textAlign = "right";
   g.fillStyle = "#7a5a3a";
   g.font = '32px "Noto Serif KR", serif';
-  g.fillText(`— ${c.typeName}의 저주 · 저주력 ${c.p} · 呪印 —`, W - 150, H - 170);
+  g.fillText(`— ${c.typeName} · 저주력 ${c.p} · 呪印 —`, W - 150, H - 170);
   g.textAlign = "center";
   g.fillStyle = "#9b8a7a";
   g.font = '30px "Noto Serif KR", serif';
@@ -850,7 +1056,11 @@ function checkBadges(ctxInfo = {}) {
     legend: ctxInfo.p >= 90,
     forbidden: ctxInfo.p >= 120,
     reflect: stats.reflected >= 1,
-    allTypes: stats.types.length >= CURSE_TYPES.length,
+    allTypes: CURSE_TYPES.every((t) => t.id === "custom" || stats.types.includes(t.id)),
+    combo20: stats.maxCombo >= 20,
+    destroy: stats.destroys >= 1,
+    pins500: stats.pins >= 500,
+    author: stats.authored,
     allSkins: stats.skins.length >= SKINS.length,
   };
   BADGES.forEach((b) => {
@@ -866,8 +1076,8 @@ function renderStats() {
   $("statRow").innerHTML = [
     ["저주", stats.curses],
     ["바늘·못", stats.pins],
-    ["그을림", stats.burns],
-    ["반사", stats.reflected],
+    ["최대 콤보", stats.maxCombo],
+    ["인형 파괴", stats.destroys],
   ].map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join("");
   $("badges").innerHTML = BADGES.map((b) => {
     const got = stats.badges.includes(b.id);
@@ -900,3 +1110,50 @@ $("clearLog").addEventListener("click", () => {
   renderLog();
 });
 renderLog();
+
+// ── 저주 룰렛 ──
+$("rouletteBtn").addEventListener("click", () => {
+  const chips = [...$("typeChips").querySelectorAll(".chip")].filter((c) => c.dataset.id !== "custom");
+  const total = 16 + rand(chips.length);
+  let i = 0;
+  const spin = () => {
+    const c = chips[i % chips.length];
+    chips.forEach((x) => x.setAttribute("aria-pressed", x === c));
+    SFX.tick(i);
+    if (++i < total) return setTimeout(spin, 30 + i * i * 0.5);
+    c.click();
+    toast(`🎰 오늘의 저주는… ${c.textContent.trim()}!`);
+  };
+  spin();
+});
+
+// ── 나만의 저주 ──
+function renderCustom() {
+  const list = CURSES.custom;
+  $("customList").innerHTML = list.length
+    ? list.map((c, i) => `<li><span>${escapeHTML(c)}</span><button type="button" data-i="${i}" aria-label="삭제">✕</button></li>`).join("")
+    : '<li class="empty">아직 없다. 직접 저주를 지어보세요.</li>';
+}
+function addCustom() {
+  const input = $("customInput");
+  const text = input.value.trim();
+  if (!text) return input.focus();
+  if (CURSES.custom.length >= 30) return toast("나만의 저주는 30개까지 저장된다");
+  CURSES.custom.push(text);
+  save("noroii-custom", CURSES.custom);
+  input.value = "";
+  renderCustom();
+  stats.authored = true;
+  checkBadges();
+  saveStats();
+}
+$("customAdd").addEventListener("click", addCustom);
+$("customInput").addEventListener("keydown", (e) => e.key === "Enter" && addCustom());
+$("customList").addEventListener("click", (e) => {
+  const i = e.target.dataset && e.target.dataset.i;
+  if (i === undefined) return;
+  CURSES.custom.splice(Number(i), 1);
+  save("noroii-custom", CURSES.custom);
+  renderCustom();
+});
+renderCustom();
